@@ -1,5 +1,5 @@
-import fetch from 'node-fetch'
-import { toCookieString } from './cookies'
+import fetch, { Response }  from 'node-fetch'
+import { toCookieString, ParsedCookie } from './cookies'
 
 export async function makeLoginTokenRequest(apiUrl) {
   const loginTokenRequestParams = new URLSearchParams({
@@ -21,18 +21,18 @@ export async function makeLoginTokenRequest(apiUrl) {
   return loginTokenRequestResult
 }
 
-export async function extractLoginToken(loginTokenRequestResult) {
+export async function extractLoginToken(loginTokenRequestResult): Promise<string> {
   const { query: { tokens: { logintoken: loginToken } } } = await loginTokenRequestResult.json()
   return loginToken
 }
 
-export async function makeLoginRequest({
-  apiUrl = "",
-  username = "",
-  password = "",
-  loginToken = "",
-  cookies = "",
-} = {}) {
+export async function makeLoginRequest(
+  apiUrl: URL = new URL(""),
+  username: string = "",
+  password: string = "",
+  loginToken: string = "",
+  cookies: Array<ParsedCookie>): Promise<Response> {
+
   const loginActionRequestBody = new URLSearchParams({
     format: 'json',
     action: 'clientlogin',
@@ -52,10 +52,10 @@ export async function makeLoginRequest({
       body: loginActionRequestBody.toString(),
     }
   )
-  return loginActionRequestResult
+  return loginActionRequestResult;
 }
 
-export function getApiUrlFromMediaWikiUrl(url) {
+export function getApiUrlFromMediaWikiUrl(url): URL {
 	const [baseUrl] = url.split('/index.php')
-	return `${baseUrl}/api.php`
+	return new URL(`${baseUrl}/api.php`);
 }

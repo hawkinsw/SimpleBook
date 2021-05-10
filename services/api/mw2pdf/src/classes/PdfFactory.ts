@@ -1,7 +1,6 @@
 import { fileURLToPath } from 'url'
 import path from 'path'
 import fs from 'fs'
-import { v4 as uuidv4 } from 'uuid'
 import PdfMerger from 'pdf-merger-js'
 import PdfPrinter from 'pdfmake'
 import {
@@ -9,43 +8,27 @@ import {
   rgb,
   StandardFonts,
 } from 'pdf-lib'
-import { Pdf } from './Pdf'
+import { Pdf, PdfConstructorOptions } from './Pdf'
 
 // The below two lines are from
 // https://stackoverflow.com/questions/32705219/nodejs-accessing-file-with-relative-path/32707530#32707530
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-export class PdfGenerator {
+export class PdfFactory {
 
-  directory: any;
-
-  constructor(directory = '') {
-    Object.assign(
-      this,
-      { directory },
-    )
+  static generatePdfObject(options: PdfConstructorOptions): Pdf {
+    return new Pdf(options);
   }
 
-  generatePdfPath() {
-    return `${this.directory}${uuidv4()}.pdf`
+  static async generateMergedPdf(pdfs: Array<Pdf>, outPdf: Pdf): Promise<Pdf> {
+    const merger = new PdfMerger();
+    pdfs.forEach(pdf => merger.add(pdf.filename));
+    await merger.save(outPdf.filename);
+    return outPdf;
   }
 
-  generatePdfObject(options = {}) {
-    return new Pdf(
-      this.generatePdfPath(),
-      options,
-    )
-  }
-
-  async generateMergedPdf(pdfs, outPdf = this.generatePdfObject()) {
-    const merger = new PdfMerger()
-    pdfs.forEach(pdf => merger.add(pdf.path))
-    await merger.save(outPdf.path)
-    return outPdf
-  }
-
-  async generateTitlePagePdf(title, outPdf = this.generatePdfObject()) {
+  static async generateTitlePagePdf(title: string, outPdf: Pdf): Promise<void> {
     const scaffold = {
       content: [
         {
@@ -65,11 +48,10 @@ export class PdfGenerator {
         },
       },
     }
-    await this.generatePdfFromScaffold(scaffold, outPdf)
-    return outPdf
+    await PdfFactory.generatePdfFromScaffold(scaffold, outPdf)
   }
 
-  async generateTableOfContentsPdf(pdfs, outPdf = this.generatePdfObject()) {
+  static async generateTableOfContentsPdf(pdfs, outPdf: Pdf): Promise<void> {
     const tocItems = await pdfs.reduce(
       async (prev, pdf) => {
         const toc = await prev
@@ -119,10 +101,10 @@ export class PdfGenerator {
         }
       }
     }
-    return await this.generatePdfFromScaffold(scaffold, outPdf)
+    await PdfFactory.generatePdfFromScaffold(scaffold, outPdf)
   }
 
-  async generatePdfFromScaffold(scaffold, outPdf = this.generatePdfObject()) {
+  static async generatePdfFromScaffold(scaffold, outPdf: Pdf): Promise<void> {
     const printer = new PdfPrinter({
       Roboto: {
         normal: path.join(__dirname, '../../fonts/Roboto-Regular.ttf'),
@@ -136,14 +118,14 @@ export class PdfGenerator {
     })
     // TODO: what is .end doing in this block -- is it sync? does it have to be called?
     const pdfDoc = printer.createPdfKitDocument(scaffold)
-    const stream = pdfDoc.pipe(fs.createWriteStream(outPdf.path))
+    const writeStream = fs.createWriteStream(outPdf.filename);
+    const stream = pdfDoc.pipe(writeStream);
     pdfDoc.end()
     await new Promise((resolve) => stream.on('finish', resolve))
-    return outPdf
   }
 
-  async generatePdfWithPageNumbers (inPdf, outPdf = this.generatePdfObject()) {
-    const pdfDoc = await PDFDocument.load(fs.readFileSync(inPdf.path))
+  static async generatePdfWithPageNumbers (inPdf: Pdf, outPdf: Pdf): Promise<void> {
+    const pdfDoc = await PDFDocument.load(fs.readFileSync(inPdf.filename))
     const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica)
     const pages = pdfDoc.getPages()
     pages.forEach((page, i) => {
@@ -156,7 +138,6 @@ export class PdfGenerator {
         color: rgb(0, 0, 0),
       })
     })
-    fs.writeFileSync(outPdf.path, await pdfDoc.save())
-    return outPdf
+    fs.writeFileSync(outPdf.filename, await pdfDoc.save())
   }
 }

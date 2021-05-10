@@ -1,10 +1,17 @@
+import { Response } from 'node-fetch';
 
-export function parseCookies(domain, response) {
+export interface ParsedCookie {
+  name: string;
+  value: string;
+  domain: string; 
+}
+
+export function parseCookies(domain: string, response: Response): Array<ParsedCookie>  {
   const raw = response.headers.raw()['set-cookie'];
   return raw.map((entry) => {
     const [cookie] = entry.split(';')
     const [name, value] = cookie.split('=')
-    return { name, value, domain};
+    return { name, value, domain };
   });
 }
 
